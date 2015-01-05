@@ -1,0 +1,158 @@
+import cmpsci220.hw.sudoku._
+import scala.collection._
+
+
+object Solution extends SudokuLike {
+  type T = Board
+  def parse(str: String): Board = { 
+    //helper method to filter out whether or not the coordinate given is mapped for one value and then must check for the rest of the peers
+      def parseHelper(board: Map[(Int, Int), List[Int]], row: Int, col: Int): Map[(Int, Int), List[Int]] = {
+      var parseBoard = board
+      val oldValues = parseBoard(row, col).head//takes the first value 
+      for(r <- 0 to 8; c <- 0 to 8){
+        for((r, c) <- (Solution.peers(row, col))  if (parseBoard(r, c).contains(oldValues))) { //iterates the list of peers from peers() and if at the row and col has a value contained within the board passed in
+        val newValue = parseBoard(r, c) diff List(oldValues)//removes all the old values from 
+        parseBoard = (parseBoard - ((r, c))) + ((r, c) -> newValue)//removes all the olf values at the coord r, c and maps it to the correct value 
+        if(newValue.size == 1)//one value means no more peers
+        parseBoard = parseHelper(board, r, c)  
+      }
+    }
+      parseBoard
+  }
+ //parse starts here
+    var sudokuBoard = Map[(Int, Int), List[Int]]()//(int, int) coordinates of board and then list for all available values; empty board
+    // Check for the strng length = 81
+    if(str.length == 81){
+      str
+    }
+    else{
+      println("insuffient length")
+      System.exit(1)
+    }
+   
+    for(r <- 0 to 8; c <- 0 to 8){ 
+      sudokuBoard = sudokuBoard + ((r,c)-> List(1, 2, 3, 4, 5, 6, 7, 8, 9))//list of all available values 
+    }
+    for(r <- 0 to 8; c <- 0 to 8){
+      val coord = r*9+c//gives you the index
+      val value = str.charAt(coord)
+      val digitVal = value.asDigit
+      if(value != '.'){
+        sudokuBoard = (sudokuBoard - ((r,c))) + ((r,c)-> List(digitVal))
+        parseHelper(sudokuBoard, r, c)
+      } 
+  }
+  new Board(sudokuBoard)
+}
+  def peers(row: Int, col: Int): List[(Int, Int)] = {
+    (for(i <- 0 until 9) yield (row,i)) ++
+    (for(i <- 0 until 9) yield (i,col)) ++
+    (for(i <- (row/3)*3 to (row/3)*3 + 2;
+      j <- (col/3)*3 to (col/3)*3 + 2) yield (i,j)
+    ) - ((row, col))
+  }
+}
+
+
+// Top-left corner is (0,0). Bottom-right corner is (8,8).
+// You don't have to have a field called available. Feel free to change it.
+class Board(sudokuBoard: Map[(Int, Int), List[Int]]) extends BoardLike[Board] {
+  type T = Board
+
+  def availableValuesAt(row: Int, col: Int): List[Int] = {
+    sudokuBoard((row,col))
+  }
+
+  def valueAt(row: Int, col: Int): Option[Int] = {
+    if(sudokuBoard(row, col).length == 1)
+      Some(sudokuBoard(row, col).head)
+    else
+      None
+  }
+
+  def isSolved(): Boolean = {
+    solve = true
+    for(((a, b), _) <- sudokuBoard if(valueAt(a, b) == None))//if it is None then there isnt an avaialable value and thus the board is unsolvable
+       solve == false
+    true
+
+  }
+
+  def isUnsolvable(): Boolean = {
+    var solve = true
+     for(((r, c), _) <- sudokuBoard if(valueAt(r, c) == List()))
+        solve
+      solve == false 
+  }
+
+  def place(row: Int, col: Int, value: Int): T = {
+    require(availableValuesAt(row, col).contains(value))
+    //helper method
+    def placeHelper(board: Map[(Int, Int), List[Int]], row: Int, col: Int): Map[(Int, Int), List[Int]] = {
+      var sBoard = board
+      //would take the peer values from peer function
+      val oldValues = board(row, col).head//takes the first value f
+      for((r, c) <- (Solution.peers(row, col)) if (sBoard(r, c).contains(oldValues))){ //iterates the list of peers from peers() and if at the row and col has a value contained within the board passed in
+        val newValue = sBoard(r, c) diff List(oldValues)//removes all the old values from 
+        sBoard = (sBoard - ((r,c))) + ((r, c) -> newValue)//removes all the olf values at the coord r, c and maps it to the correct value 
+        if(newValue.length == 1)//one value means no more peers
+          sBoard = placeHelper(sBoard, r, c)  
+      }
+      sBoard
+    }
+    //start of place
+    var sBoard = sudokuBoard//board that is passed in header of class Board
+    var updateBoard = (sBoard - ((row, col))) + ((row, col) -> List(value))//removes the old value from row and col and maps the new specific value that is passed in
+    sBoard = updateBoard
+    sBoard = placeHelper(sBoard, row, col)
+    new Board(sBoard)
+  }
+
+  // You can return any Iterable (e.g., Stream)
+  def nextStates(): List[Board] = {
+
+    //helper method to calculate all availbale values on the board--needed to be sorted
+    def totalPresent(brd : Board): Int = {
+      var counter = 0
+      for(r <- 0 to 80; c <- 0 to 80){
+        if(sudokuBoard(r, c).size > 1)
+          counter = counter + sudokuBoard((r, c)).size
+      }
+      counter
+  }
+      //nextStates starts
+    var nextBoard = List[Board]()//
+    if(isSolved())
+      List()
+    else if (isUnsolvable())
+      List()
+    else{
+      for( ((r, c), validBoard) <- sudokuBoard if (valueAt(r,c) == None)) {
+        for(value <- validBoard)//value is an arbitrary name
+        nextBoard = place(r, c, value) :: nextBoard
+        return nextBoard.sortBy(brd => totalPresent(brd))
+      }
+    }  
+     return nextBoard.sortBy(brd => totalPresent(brd))//empty board
+  }
+//If this.isSolution is true, then return Some(this). 
+//If not, iterate through the list of nextStates, applying solve to board. Return the first solution that you find. If no solution is found, return None.
+  def solve(): Option[Board] = {
+    if(this.isSolved())
+      Some(this)
+  else if (this.isUnsolvable())
+    None
+  else{
+    for(next <- nextStates()){//search every next board of nextStates
+      var boardSolved = next.solve()
+      if(boardSolved == None)
+        None
+      else
+        boardSolved
+    }
+  }
+  None
+  
+}
+
+}
